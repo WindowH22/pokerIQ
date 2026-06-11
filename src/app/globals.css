@@ -1,26 +1,93 @@
 @import "tailwindcss";
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
-}
-
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  /* Poker dark luxury palette */
+  --color-felt: oklch(18% 0.04 145);
+  --color-felt-light: oklch(22% 0.04 145);
+  --color-gold: oklch(78% 0.16 78);
+  --color-gold-dim: oklch(60% 0.12 78);
+  --color-chip-red: oklch(55% 0.22 25);
+  --color-chip-blue: oklch(52% 0.18 240);
+  --color-chip-black: oklch(20% 0.01 0);
+  --color-surface: oklch(14% 0.02 240);
+  --color-surface-raised: oklch(19% 0.02 240);
+  --color-surface-border: oklch(28% 0.03 240);
+  --color-text-primary: oklch(94% 0.01 80);
+  --color-text-muted: oklch(60% 0.02 240);
+  --color-suit-spade: oklch(90% 0 0);
+  --color-suit-heart: oklch(60% 0.22 25);
+  --color-suit-diamond: oklch(60% 0.22 25);
+  --color-suit-club: oklch(90% 0 0);
+
+  /* Spacing scale */
+  --space-section: clamp(3rem, 2rem + 4vw, 6rem);
+
+  /* Typography */
+  --text-hero: clamp(2rem, 1rem + 4vw, 4rem);
+  --text-card-rank: clamp(1.5rem, 1rem + 2vw, 2.5rem);
+
+  /* Easing */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 150ms;
+  --duration-normal: 250ms;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+*, *::before, *::after {
+  box-sizing: border-box;
+}
+
+html {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: var(--color-surface);
+  color: var(--color-text-primary);
+  font-family: var(--font-sans), system-ui, sans-serif;
+  min-height: 100dvh;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Felt texture overlay */
+.felt-bg {
+  background: var(--color-felt);
+  background-image:
+    radial-gradient(ellipse at 50% 0%, oklch(25% 0.06 145 / 0.4) 0%, transparent 60%),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='4' height='4'%3E%3Crect width='4' height='4' fill='none'/%3E%3Ccircle cx='1' cy='1' r='0.5' fill='white' opacity='0.015'/%3E%3C/svg%3E");
+}
+
+/* Gold shimmer text */
+.text-gold {
+  color: var(--color-gold);
+}
+
+/* Card shadow */
+.card-shadow {
+  box-shadow:
+    0 1px 3px oklch(0% 0 0 / 0.5),
+    0 4px 16px oklch(0% 0 0 / 0.4),
+    0 0 0 1px oklch(100% 0 0 / 0.06);
+}
+
+/* Glow effect for active elements */
+.glow-gold {
+  box-shadow:
+    0 0 12px oklch(78% 0.16 78 / 0.25),
+    0 0 40px oklch(78% 0.16 78 / 0.1);
+}
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: var(--color-surface);
+}
+::-webkit-scrollbar-thumb {
+  background: var(--color-surface-border);
+  border-radius: 3px;
 }

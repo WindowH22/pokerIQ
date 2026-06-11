@@ -39,3 +39,16 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# drizzle (generated migrations)
+drizzle/
+
+# turbo
+.turbo
+
+# editor
+.vscode/
+.idea/
+
+# os
+Thumbs.db
