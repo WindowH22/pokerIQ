@@ -14,23 +14,28 @@ const SUIT_COLORS: Record<Suit, string> = {
   club: 'text-[var(--color-suit-club)]',
 }
 
+const SIZE = {
+  sm: { container: 'w-10 h-14', corner: 'text-sm', center: 'text-2xl' },
+  md: { container: 'w-14 h-20', corner: 'text-base', center: 'text-3xl' },
+  lg: { container: 'w-20 h-28', corner: 'text-xl', center: 'text-5xl' },
+} as const
+
+type CardSize = keyof typeof SIZE
+
 interface PlayingCardProps {
   card: Card
-  size?: 'sm' | 'md' | 'lg'
+  size?: CardSize
   faceDown?: boolean
+  className?: string
 }
 
-const sizeClasses = {
-  sm: 'w-10 h-14 text-base',
-  md: 'w-14 h-20 text-xl',
-  lg: 'w-20 h-28 text-3xl',
-}
+export function PlayingCard({ card, size = 'md', faceDown = false, className = '' }: PlayingCardProps) {
+  const { container, corner, center } = SIZE[size]
 
-export function PlayingCard({ card, size = 'md', faceDown = false }: PlayingCardProps) {
   if (faceDown) {
     return (
       <div
-        className={`${sizeClasses[size]} rounded-md flex items-center justify-center bg-[var(--color-chip-blue)] border border-[oklch(52%_0.18_240/0.5)] card-shadow`}
+        className={`${container} card-back rounded-md card-shadow flex items-center justify-center ${className}`}
         aria-label="Face-down card"
       >
         <span className="text-[oklch(52%_0.18_240/0.5)] text-2xl">?</span>
@@ -40,32 +45,42 @@ export function PlayingCard({ card, size = 'md', faceDown = false }: PlayingCard
 
   const suitColor = SUIT_COLORS[card.suit]
   const symbol = SUIT_SYMBOLS[card.suit]
+  const rank = card.rank === 'T' ? '10' : card.rank
 
   return (
     <div
-      className={`${sizeClasses[size]} rounded-md relative bg-[oklch(96%_0.01_80)] border border-[oklch(70%_0_0/0.2)] card-shadow flex flex-col justify-between p-1`}
-      aria-label={`${card.rank} of ${card.suit}s`}
+      className={`${container} card-face rounded-md card-shadow relative flex flex-col justify-between p-1 ${className}`}
+      aria-label={`${rank} of ${card.suit}s`}
     >
-      <span className={`font-bold leading-none ${suitColor} ${size === 'sm' ? 'text-sm' : size === 'md' ? 'text-base' : 'text-xl'}`}>
-        {card.rank}
-        <br />
-        <span className="text-xs">{symbol}</span>
+      <span className={`font-bold leading-none ${suitColor} ${corner}`}>
+        {rank}
       </span>
-      <span className={`self-end font-bold leading-none rotate-180 ${suitColor} ${size === 'sm' ? 'text-sm' : size === 'md' ? 'text-base' : 'text-xl'}`}>
-        {card.rank}
+      <span className={`self-end font-bold leading-none rotate-180 ${suitColor} ${corner}`}>
+        {rank}
         <br />
-        <span className="text-xs">{symbol}</span>
       </span>
-      <span className={`absolute inset-0 flex items-center justify-center ${suitColor} opacity-20 ${size === 'sm' ? 'text-2xl' : size === 'md' ? 'text-3xl' : 'text-5xl'}`}>
+      <span className={`absolute inset-0 flex items-center justify-center ${suitColor}  ${center}`}>
         {symbol}
       </span>
     </div>
   )
 }
 
+export function MysteryCard({ size = 'md', className = '' }: { size?: CardSize; className?: string }) {
+  const { container } = SIZE[size]
+  return (
+    <div
+      className={`${container} card-mystery rounded-md card-shadow flex items-center justify-center text-[var(--color-text-muted)] font-bold ${className}`}
+      aria-label="Unknown card"
+    >
+      <span className="text-xl">?</span>
+    </div>
+  )
+}
+
 interface HoleCardsProps {
   cards: Card[]
-  size?: 'sm' | 'md' | 'lg'
+  size?: CardSize
 }
 
 export function HoleCards({ cards, size = 'md' }: HoleCardsProps) {
