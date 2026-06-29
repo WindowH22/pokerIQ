@@ -1,6 +1,14 @@
 import { generateText } from 'ai'
-import { anthropic } from '@ai-sdk/anthropic'
+import { createGroq } from '@ai-sdk/groq'
+
+const groq = createGroq({ apiKey: process.env.GROQ_API_KEY })
 import type { Problem, Submission, Evaluation, EvaluationScore } from '@/types'
+
+const KNOWN_CONCEPT_IDS = [
+  'icm', 'gto', 'pot_odds', 'push_fold', 'bubble_factor',
+  'range', 'equity', 'fold_equity', 'spr', 'three_bet',
+  'continuation_bet', 'implied_odds',
+] as const
 
 interface ChecklistResult {
   criteriaId: string
@@ -13,10 +21,12 @@ function buildEvaluationPrompt(problem: Problem, submission: Submission): string
   const checklistText = problem.rubric.criteria
     .map(
       (c) =>
-        `## ${c.nameKo} (최대 ${c.maxScore}점)\n` +
+        `## [criteriaId: "${c.id}"] ${c.nameKo} (최대 ${c.maxScore}점)\n` +
         c.checklistItems.map((item, i) => `${i + 1}. ${item}`).join('\n')
     )
     .join('\n\n')
+
+  const criteriaIds = problem.rubric.criteria.map((c) => c.id)
 
   return `당신은 포커 교육 플랫폼의 채점 AI입니다. 아래 규칙에 따라 학생의 답변을 평가하세요.
 
@@ -39,18 +49,14 @@ ${problem.correctAction}
 ${checklistText}
 
 ## 응답 형식 (JSON만 출력하세요)
+criteriaId는 반드시 위에 표시된 값(${criteriaIds.join(', ')})을 그대로 사용하세요.
+conceptIds는 아래 목록에서만 선택하세요 (0-3개): ${KNOWN_CONCEPT_IDS.join(', ')}
 {
   "checklist": [
-    {
-      "criteriaId": "string",
-      "checkedItems": [true/false, ...]
-    }
+${criteriaIds.map((id) => `    {"criteriaId": "${id}", "checkedItems": [true/false, ...]}`).join(',\n')}
   ],
-  "overallFeedback": "전반적인 피드백 (한국어, 2-3문장)",
-  "conceptsToLearn": ["개념1", "개념2"],
-  "conceptExplanations": {
-    "개념1": "간단한 설명 (1-2문장)"
-  }
+  "overallFeedback": "overall feedback in Korean (2-3 sentences)",
+  "conceptIds": ["icm", "push_fold"]
 }
 
 중요: JSON 외에 다른 텍스트를 출력하지 마세요.`
@@ -88,18 +94,22 @@ function calculateScores(
   })
 }
 
+export type EvalResult = Omit<Evaluation, 'id' | 'submissionId' | 'createdAt' | 'conceptsToLearn' | 'conceptExplanations'> & {
+  conceptIds: string[]
+}
+
 export async function evaluateSubmission(
   problem: Problem,
   submission: Submission
-): Promise<Omit<Evaluation, 'id' | 'submissionId' | 'createdAt'>> {
-  if (!process.env.ANTHROPIC_API_KEY) {
-    throw new Error('ANTHROPIC_API_KEY not configured')
+): Promise<EvalResult> {
+  if (!process.env.GROQ_API_KEY) {
+    throw new Error('GROQ_API_KEY not configured')
   }
 
   const prompt = buildEvaluationPrompt(problem, submission)
 
   const { text } = await generateText({
-    model: anthropic('claude-haiku-4-5'),
+    model: groq('llama-3.1-8b-instant'),
     prompt,
     maxOutputTokens: 1024,
   })
@@ -107,26 +117,31 @@ export async function evaluateSubmission(
   let parsed: {
     checklist: ChecklistResult[]
     overallFeedback: string
-    conceptsToLearn: string[]
-    conceptExplanations: Record<string, string>
+    conceptIds: string[]
   }
 
   try {
-    parsed = JSON.parse(text)
-  } catch {
-    throw new Error('AI returned invalid JSON')
+    const jsonMatch = text.match(/\{[\s\S]*\}/)
+    if (!jsonMatch) throw new Error(`no JSON found in: ${text.slice(0, 200)}`)
+    parsed = JSON.parse(jsonMatch[0])
+  } catch (e) {
+    throw new Error(`AI returned invalid JSON: ${e instanceof Error ? e.message : String(e)}`)
   }
 
   const scores = calculateScores(problem, parsed.checklist)
   const totalScore = scores.reduce((sum, s) => sum + s.score, 0)
   const maxScore = scores.reduce((sum, s) => sum + s.maxScore, 0)
 
+  const rawConceptIds: string[] = Array.isArray(parsed.conceptIds) ? parsed.conceptIds : []
+  const validConceptIds = rawConceptIds.filter((id) =>
+    (KNOWN_CONCEPT_IDS as readonly string[]).includes(id)
+  )
+
   return {
     scores,
     totalScore,
     maxScore,
     overallFeedback: parsed.overallFeedback,
-    conceptsToLearn: parsed.conceptsToLearn ?? [],
-    conceptExplanations: parsed.conceptExplanations ?? {},
+    conceptIds: validConceptIds,
   }
 }

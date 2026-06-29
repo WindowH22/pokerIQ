@@ -13,6 +13,12 @@ export type Position =
 
 export type Action = 'FOLD' | 'CALL' | 'RAISE' | 'CHECK' | 'ALL_IN' | 'LIMP'
 
+export interface ActionEvent {
+  position: Position
+  action: Action
+  amount?: number
+}
+
 export type Difficulty = 'BEGINNER' | 'INTERMEDIATE' | 'ADVANCED' | 'EXPERT'
 
 export type ProblemCategory =
@@ -50,6 +56,7 @@ export interface GameContext {
   payoutStructure?: PayoutStructure[]
   tournamentStage?: 'EARLY' | 'MIDDLE' | 'BUBBLE' | 'ITM' | 'FINAL_TABLE'
   totalChips?: number
+  actionSequence?: ActionEvent[]
 }
 
 export interface RubricCriteria {

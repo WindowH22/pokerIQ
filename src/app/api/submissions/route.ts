@@ -1,8 +1,9 @@
+export const maxDuration = 30
+
 import { NextRequest, NextResponse } from 'next/server'
 import { z } from 'zod'
-import { db, problems, submissions, evaluations } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
-import { auth } from '@/lib/auth'
+import { PROBLEMS } from '@/lib/data/problems'
+import { CONCEPTS } from '@/lib/data/concepts'
 import { evaluateSubmission } from '@/lib/ai/evaluate'
 import type { ApiResponse, Problem, Submission } from '@/types'
 
@@ -13,14 +14,6 @@ const submitSchema = z.object({
 })
 
 export async function POST(req: NextRequest) {
-  const session = await auth()
-  if (!session?.user?.id) {
-    return NextResponse.json<ApiResponse<never>>(
-      { success: false, error: '로그인이 필요합니다.' },
-      { status: 401 }
-    )
-  }
-
   let body: unknown
   try {
     body = await req.json()
@@ -41,41 +34,23 @@ export async function POST(req: NextRequest) {
 
   const { problemId, action, reasoning } = parsed.data
 
+  const problem = PROBLEMS.find((p) => p.id === problemId && p.publishedAt !== null) as Problem | undefined
+
+  if (!problem) {
+    return NextResponse.json<ApiResponse<never>>(
+      { success: false, error: '문제를 찾을 수 없습니다.' },
+      { status: 404 }
+    )
+  }
+
   try {
-    const [problemRow] = await db
-      .select()
-      .from(problems)
-      .where(and(eq(problems.id, problemId), eq(problems.isPublished, true)))
-      .limit(1)
-
-    if (!problemRow) {
-      return NextResponse.json<ApiResponse<never>>(
-        { success: false, error: '문제를 찾을 수 없습니다.' },
-        { status: 404 }
-      )
-    }
-
-    const problem: Problem = {
-      ...problemRow,
-      gameContext: problemRow.gameContext as Problem['gameContext'],
-      rubric: problemRow.rubric as Problem['rubric'],
-      publishedAt: problemRow.publishedAt?.toISOString() ?? null,
-      createdAt: problemRow.createdAt.toISOString(),
-    } as unknown as Problem
-
     const submissionId = crypto.randomUUID()
-    await db.insert(submissions).values({
-      id: submissionId,
-      problemId,
-      userId: session.user.id,
-      action,
-      reasoning,
-    })
+    const evaluationId = crypto.randomUUID()
 
     const partialSubmission: Submission = {
       id: submissionId,
       problemId,
-      userId: session.user.id,
+      userId: '',
       action: action as Submission['action'],
       reasoning,
       submittedAt: new Date().toISOString(),
@@ -83,33 +58,37 @@ export async function POST(req: NextRequest) {
 
     const evalResult = await evaluateSubmission(problem, partialSubmission)
 
-    const evaluationId = crypto.randomUUID()
-    await db.insert(evaluations).values({
-      id: evaluationId,
-      submissionId,
-      scores: evalResult.scores,
-      totalScore: evalResult.totalScore,
-      maxScore: evalResult.maxScore,
-      overallFeedback: evalResult.overallFeedback,
-      conceptsToLearn: evalResult.conceptsToLearn,
-      conceptExplanations: evalResult.conceptExplanations,
-    })
+    const relatedConcepts = evalResult.conceptIds.length > 0
+      ? CONCEPTS.filter((c) => evalResult.conceptIds.includes(c.id))
+      : []
+
+    const conceptsToLearn = relatedConcepts.map((c) => c.termKo)
+    const conceptExplanations: Record<string, string> = {}
+    for (const c of relatedConcepts) {
+      conceptExplanations[c.termKo] = c.shortDescription
+    }
 
     const data: Submission = {
       ...partialSubmission,
       evaluation: {
         id: evaluationId,
         submissionId,
-        ...evalResult,
+        scores: evalResult.scores,
+        totalScore: evalResult.totalScore,
+        maxScore: evalResult.maxScore,
+        overallFeedback: evalResult.overallFeedback,
+        conceptsToLearn,
+        conceptExplanations,
         createdAt: new Date().toISOString(),
       },
     }
 
     return NextResponse.json<ApiResponse<Submission>>({ success: true, data }, { status: 201 })
   } catch (error) {
+    const msg = error instanceof Error ? error.message : String(error)
     console.error('Submission error:', error)
     return NextResponse.json<ApiResponse<never>>(
-      { success: false, error: '제출 처리 중 오류가 발생했습니다.' },
+      { success: false, error: process.env.NODE_ENV === 'development' ? msg : '제출 처리 중 오류가 발생했습니다.' },
       { status: 500 }
     )
   }
