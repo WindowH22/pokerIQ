@@ -1,10 +1,97 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import type { Action, Problem, Submission } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
+import { PROBLEMS } from '@/lib/data/problems'
+
+function renderInlineMarkdown(text: string): React.ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/)
+  return parts.map((part, i) => {
+    if (part.startsWith('**') && part.endsWith('**')) {
+      return <strong key={i} className="font-semibold text-[var(--color-text-primary)]">{part.slice(2, -2)}</strong>
+    }
+    return part
+  })
+}
+
+function ModelAnswer({ text }: { text: string }) {
+  const blocks = text.split(/\n\n+/)
+
+  return (
+    <div className="space-y-3 text-sm leading-relaxed text-[var(--color-text-primary)]">
+      {blocks.map((block, i) => {
+        const lines = block.split('\n')
+
+        if (lines.every(l => l.trimStart().startsWith('- '))) {
+          return (
+            <ul key={i} className="space-y-1 pl-1">
+              {lines.map((line, j) => (
+                <li key={j} className="flex gap-2">
+                  <span className="mt-[0.35em] size-1.5 shrink-0 rounded-full bg-[var(--color-gold)]" />
+                  <span className="text-[var(--color-text-muted)]">{renderInlineMarkdown(line.replace(/^-\s*/, ''))}</span>
+                </li>
+              ))}
+            </ul>
+          )
+        }
+
+        const hasListLines = lines.some(l => l.trimStart().startsWith('- '))
+        if (hasListLines) {
+          return (
+            <div key={i} className="space-y-1.5">
+              {lines.map((line, j) => {
+                if (line.trimStart().startsWith('- ')) {
+                  return (
+                    <div key={j} className="flex gap-2">
+                      <span className="mt-[0.35em] size-1.5 shrink-0 rounded-full bg-[var(--color-gold)]" />
+                      <span className="text-[var(--color-text-muted)]">{renderInlineMarkdown(line.replace(/^-\s*/, ''))}</span>
+                    </div>
+                  )
+                }
+                return (
+                  <p key={j} className={line.startsWith('**') ? 'font-semibold text-[var(--color-gold)]' : 'text-[var(--color-text-muted)]'}>
+                    {renderInlineMarkdown(line)}
+                  </p>
+                )
+              })}
+            </div>
+          )
+        }
+
+        const isBoldBlock = block.startsWith('**') && block.trimEnd().endsWith('**')
+        if (isBoldBlock) {
+          return (
+            <p key={i} className="font-semibold text-[var(--color-gold)]">
+              {renderInlineMarkdown(block)}
+            </p>
+          )
+        }
+
+        const hasSectionHeader = lines[0].startsWith('**') && lines.length > 1
+        if (hasSectionHeader) {
+          return (
+            <div key={i} className="space-y-1">
+              <p className="font-semibold text-[var(--color-gold)]">{renderInlineMarkdown(lines[0])}</p>
+              {lines.slice(1).map((line, j) => (
+                <p key={j} className="text-[var(--color-text-muted)]">{renderInlineMarkdown(line)}</p>
+              ))}
+            </div>
+          )
+        }
+
+        return (
+          <p key={i} className="text-[var(--color-text-muted)]">
+            {renderInlineMarkdown(block)}
+          </p>
+        )
+      })}
+    </div>
+  )
+}
 
 const ACTION_LABELS: Record<string, string> = {
   FOLD: '폴드 (Fold)',
@@ -76,8 +163,14 @@ export function SubmitForm({ problem }: SubmitFormProps) {
   }
 
   if (result?.submission.evaluation) {
-    return <EvaluationDisplay submission={result.submission} problem={problem} />
+    return <EvaluationDisplay submission={result.submission} problem={problem} onReset={() => setResult(null)} />
   }
+
+  const submitHint = !selectedAction
+    ? '액션을 먼저 선택해주세요'
+    : reasoning.trim().length < 10
+      ? `근거를 ${10 - reasoning.trim().length}자 더 입력해주세요`
+      : null
 
   return (
     <div className="space-y-6">
@@ -135,6 +228,9 @@ export function SubmitForm({ problem }: SubmitFormProps) {
       >
         {loading ? 'AI가 채점 중...' : 'AI 채점 받기'}
       </Button>
+      {submitHint && (
+        <p className="text-xs text-center text-[var(--color-text-muted)]">{submitHint}</p>
+      )}
     </div>
   )
 }
@@ -142,11 +238,22 @@ export function SubmitForm({ problem }: SubmitFormProps) {
 interface EvaluationDisplayProps {
   submission: Submission
   problem: Problem
+  onReset: () => void
 }
 
-function EvaluationDisplay({ submission, problem }: EvaluationDisplayProps) {
+const DIFFICULTY_ORDER = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'] as const
+
+function EvaluationDisplay({ submission, problem, onReset }: EvaluationDisplayProps) {
   const eval_ = submission.evaluation!
   const pct = Math.round((eval_.totalScore / eval_.maxScore) * 100)
+
+  const published = PROBLEMS.filter((p) => p.publishedAt !== null && p.id !== problem.id)
+  const passed = pct >= 80
+  const targetDifficulty = passed
+    ? DIFFICULTY_ORDER[Math.min(DIFFICULTY_ORDER.indexOf(problem.difficulty) + 1, DIFFICULTY_ORDER.length - 1)]
+    : problem.difficulty
+  const nextProblem = published.find((p) => p.difficulty === targetDifficulty) ?? null
+  const nextLabel = passed ? '난이도 업 ↑' : '같은 레벨로 다시'
   const isCorrectAction = submission.action === problem.correctAction
 
   const gradeColor =
@@ -263,11 +370,25 @@ function EvaluationDisplay({ submission, problem }: EvaluationDisplayProps) {
           </h3>
         </Card.Header>
         <Card.Body>
-          <div className="text-sm text-[var(--color-text-primary)] leading-relaxed whitespace-pre-line">
-            {problem.rubric.modelAnswer}
-          </div>
+          <ModelAnswer text={problem.rubric.modelAnswer} />
         </Card.Body>
       </Card>
+
+      {/* Next actions */}
+      <div className="flex gap-3 pt-2">
+        <Button variant="secondary" onClick={onReset} className="flex-1">
+          다시 풀기
+        </Button>
+        {nextProblem ? (
+          <Link href={`/problems/${nextProblem.slug}`} className="flex-1">
+            <Button className="w-full">{nextLabel}</Button>
+          </Link>
+        ) : (
+          <Link href="/problems" className="flex-1">
+            <Button className="w-full">문제 목록</Button>
+          </Link>
+        )}
+      </div>
     </div>
   )
 }

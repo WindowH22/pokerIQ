@@ -1,12 +1,13 @@
+import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { db, problems } from '@/lib/db'
-import { eq, and } from 'drizzle-orm'
+import { PROBLEMS } from '@/lib/data/problems'
 import { PokerTable } from '@/components/features/problem/PokerTable'
 import { HoleCards, BoardCards } from '@/components/features/problem/CardDisplay'
 import { SubmitForm } from '@/components/features/problem/SubmitForm'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
-import type { Problem, Difficulty, ProblemCategory } from '@/types'
+import { RichText } from '@/components/ui/RichText'
+import type { Difficulty, ProblemCategory } from '@/types'
 
 const DIFFICULTY_LABELS: Record<Difficulty, string> = {
   BEGINNER: '입문',
@@ -35,37 +36,17 @@ const CATEGORY_LABELS: Record<ProblemCategory, string> = {
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
-  const [row] = await db
-    .select({ title: problems.title })
-    .from(problems)
-    .where(and(eq(problems.slug, slug), eq(problems.isPublished, true)))
-    .limit(1)
-
+  const problem = PROBLEMS.find((p) => p.slug === slug && p.publishedAt !== null)
   return {
-    title: row ? `${row.title} — Poker IQ` : 'Poker IQ',
+    title: problem ? `${problem.title} — Poker IQ` : 'Poker IQ',
   }
 }
 
-export const revalidate = 60
-
 export default async function ProblemPage({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
+  const problem = PROBLEMS.find((p) => p.slug === slug && p.publishedAt !== null)
 
-  const [row] = await db
-    .select()
-    .from(problems)
-    .where(and(eq(problems.slug, slug), eq(problems.isPublished, true)))
-    .limit(1)
-
-  if (!row) notFound()
-
-  const problem: Problem = {
-    ...row,
-    gameContext: row.gameContext as Problem['gameContext'],
-    rubric: row.rubric as Problem['rubric'],
-    publishedAt: row.publishedAt?.toISOString() ?? null,
-    createdAt: row.createdAt.toISOString(),
-  } as unknown as Problem
+  if (!problem) notFound()
 
   const { gameContext } = problem
 
@@ -76,7 +57,8 @@ export default async function ProblemPage({ params }: { params: Promise<{ slug: 
         <div className="space-y-6">
           {/* Header */}
           <div>
-            <div className="flex gap-2 flex-wrap mb-3">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex gap-2 flex-wrap">
               <Badge variant={DIFFICULTY_COLORS[problem.difficulty]}>
                 {DIFFICULTY_LABELS[problem.difficulty]}
               </Badge>
@@ -88,6 +70,13 @@ export default async function ProblemPage({ params }: { params: Promise<{ slug: 
                    gameContext.tournamentStage === 'MIDDLE' ? '미들 스테이지' : '얼리 스테이지'}
                 </Badge>
               )}
+              </div>
+              <Link
+                href="/problems"
+                className="shrink-0 text-xs text-[var(--color-text-muted)] hover:text-[var(--color-gold)] transition-colors border border-[var(--color-surface-border)] hover:border-[var(--color-gold-dim)] rounded-lg px-3 py-1.5"
+              >
+                다른 문제 풀기
+              </Link>
             </div>
             <h1 className="text-3xl font-bold text-[var(--color-text-primary)]">
               {problem.title}
@@ -111,6 +100,7 @@ export default async function ProblemPage({ params }: { params: Promise<{ slug: 
                 players={gameContext.players}
                 heroPosition={gameContext.heroPosition}
                 potSize={gameContext.potSize}
+                actionSequence={gameContext.actionSequence}
                 className="mb-4"
               />
 
@@ -175,9 +165,7 @@ export default async function ProblemPage({ params }: { params: Promise<{ slug: 
               </h2>
             </Card.Header>
             <Card.Body>
-              <div className="text-sm text-[var(--color-text-primary)] leading-relaxed whitespace-pre-line">
-                {problem.description}
-              </div>
+              <RichText text={problem.description} />
             </Card.Body>
           </Card>
 
