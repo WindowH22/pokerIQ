@@ -88,11 +88,11 @@ export default function HomePage() {
           </div>
 
           {/* Suit decoration */}
-          <div className="mt-16 flex justify-center gap-8 text-5xl opacity-10 select-none" aria-hidden="true">
-            <span className="text-[var(--color-suit-spade)]">♠</span>
-            <span className="text-[var(--color-suit-heart)]">♥</span>
-            <span className="text-[var(--color-suit-diamond)]">♦</span>
-            <span className="text-[var(--color-suit-club)]">♣</span>
+          <div className="mt-16 flex justify-center gap-8 text-5xl select-none" aria-hidden="true">
+            <span className="text-[var(--color-suit-dark-black)] opacity-35">♠</span>
+            <span className="text-[var(--color-suit-dark-red)] opacity-55">♥</span>
+            <span className="text-[var(--color-suit-dark-red)] opacity-55">♦</span>
+            <span className="text-[var(--color-suit-dark-black)] opacity-35">♣</span>
           </div>
         </div>
       </section>
