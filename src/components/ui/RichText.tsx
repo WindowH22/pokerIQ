@@ -1,16 +1,22 @@
 import type { ReactNode } from 'react'
+import { annotateGlossary } from '@/lib/glossary'
 
-function renderInline(text: string): ReactNode[] {
-  return text.split(/(\*\*[^*]+\*\*)/).map((part, i) => {
+function renderInline(text: string, keyPrefix: string | number = 0): ReactNode[] {
+  const parts = text.split(/(\*\*[^*]+\*\*)/)
+  const out: ReactNode[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
     if (part.startsWith('**') && part.endsWith('**')) {
-      return (
+      out.push(
         <strong key={i} className="text-[var(--color-text-primary)] font-semibold">
           {part.slice(2, -2)}
         </strong>
       )
+    } else {
+      out.push(...annotateGlossary(part, `${keyPrefix}-${i}`))
     }
-    return part
-  })
+  }
+  return out
 }
 
 export function RichText({ text }: { text: string }) {
@@ -31,7 +37,7 @@ export function RichText({ text }: { text: string }) {
               {bulletLines.map((item, i) => (
                 <li key={i} className="flex gap-2.5 text-[var(--color-text-muted)] text-sm">
                   <span className="text-[var(--color-gold)] shrink-0 mt-0.5">▸</span>
-                  <span>{renderInline(item.replace(/^-\s*/, ''))}</span>
+                  <span>{renderInline(item.replace(/^-\s*/, ''), `${blockIdx}-${i}`)}</span>
                 </li>
               ))}
             </ul>
@@ -43,20 +49,20 @@ export function RichText({ text }: { text: string }) {
           return (
             <div key={blockIdx} className="space-y-1.5">
               <p className="text-xs font-semibold uppercase tracking-widest text-[var(--color-gold)]">
-                {renderInline(lines[0])}
+                {renderInline(lines[0], `${blockIdx}-h`)}
               </p>
               {lines.slice(1).map((line, j) => {
                 if (line.trim().startsWith('-')) {
                   return (
                     <div key={j} className="flex gap-2.5 text-sm text-[var(--color-text-muted)]">
                       <span className="text-[var(--color-gold)] shrink-0 mt-0.5">▸</span>
-                      <span>{renderInline(line.replace(/^-\s*/, ''))}</span>
+                      <span>{renderInline(line.replace(/^-\s*/, ''), `${blockIdx}-${j}`)}</span>
                     </div>
                   )
                 }
                 return (
                   <p key={j} className="text-sm text-[var(--color-text-muted)]">
-                    {renderInline(line)}
+                    {renderInline(line, `${blockIdx}-${j}`)}
                   </p>
                 )
               })}
@@ -68,7 +74,7 @@ export function RichText({ text }: { text: string }) {
           <p key={blockIdx} className="text-sm text-[var(--color-text-muted)] leading-relaxed">
             {lines.map((line, lineIdx) => (
               <span key={lineIdx}>
-                {renderInline(line)}
+                {renderInline(line, `${blockIdx}-${lineIdx}`)}
                 {lineIdx < lines.length - 1 && <br />}
               </span>
             ))}

@@ -36,21 +36,26 @@ function buildEvaluationPrompt(problem: Problem, submission: Submission): string
 - 절대 사무적이거나 기계적인 말투 사용 금지
 - 문장 끝은 반드시 "~하네", "~하게나", "~이야", "~하길 바라네" 중 하나로 통일
 
+평가 원칙:
+- 포커에서 하나의 정답만 존재하지 않는다. 학생이 선택한 액션이 모범 답안과 달라도 논리적으로 타당하다면 높은 점수를 줄 수 있다.
+- 액션 체크리스트 항목은 "이 액션이 이 상황에서 합리적인가"를 기준으로 판단하라. 단순히 모범 답안과 일치하지 않는다는 이유만으로 false를 주지 마라.
+- 근거가 없는 경우(빠른 채점)에는 액션의 합리성만 평가하고 근거 관련 항목은 false로 처리하라.
+
 ## 문제
 ${problem.title}
 
 ## 상황
 ${problem.description}
 
-## 정답 액션
-${problem.correctAction}
+## 모범 답안 액션 (참고용)
+${problem.correctAction} ${actionMatch ? '(학생과 동일)' : '(학생과 다름 — 단, 학생 액션이 타당할 수 있음)'}
 
 ## 학생 답변
-- 선택한 액션: ${submission.action} ${actionMatch ? '(정답)' : '(오답)'}
-- 근거: ${submission.reasoning}
+- 선택한 액션: ${submission.action}
+- 근거: ${submission.reasoning || '(근거 없음 — 액션 선택만 평가)'}
 
 ## 채점 체크리스트
-각 기준별로 아래 항목들이 충족되는지 true/false로만 판단하세요.
+각 기준별로 아래 항목들이 충족되는지 true/false로 판단하세요.
 
 ${checklistText}
 

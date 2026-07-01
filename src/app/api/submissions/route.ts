@@ -10,7 +10,7 @@ import type { ApiResponse, Problem, Submission } from '@/types'
 const submitSchema = z.object({
   problemId: z.string().min(1),
   action: z.enum(['FOLD', 'CALL', 'RAISE', 'CHECK', 'ALL_IN', 'LIMP']),
-  reasoning: z.string().min(10, '근거는 최소 10자 이상 입력해주세요.').max(2000),
+  reasoning: z.string().max(2000).default(''),
 })
 
 export async function POST(req: NextRequest) {

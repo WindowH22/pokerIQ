@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { Button } from '@/components/ui/Button'
 import { Badge } from '@/components/ui/Badge'
 import { Card } from '@/components/ui/Card'
+import { HomeSampleQuiz } from '@/components/features/HomeSampleQuiz'
 
 const FEATURES = [
   {
@@ -26,32 +27,6 @@ const FEATURES = [
   },
 ]
 
-const DIFFICULTY_COLORS = {
-  '입문': 'green' as const,
-  '중급': 'blue' as const,
-  '고급': 'gold' as const,
-}
-
-const SAMPLE_PROBLEMS = [
-  {
-    title: '파이널 테이블 5인, 2등 vs 칩리더',
-    difficulty: '고급',
-    category: 'ICM',
-    desc: '2등 스택으로 숏스택 올인 + 칩리더 콜 상황에서 KQo 스퀴즈를 해야 할까?',
-  },
-  {
-    title: 'BTN 숏스택 10BB Push/Fold',
-    difficulty: '입문',
-    category: 'Push/Fold',
-    desc: '10BB BTN에서 A7o. 버블도 아닌 상황에서 올인 또는 폴드?',
-  },
-  {
-    title: 'BB 방어: BTN 오픈에 T9s 3-벳?',
-    difficulty: '중급',
-    category: 'Range',
-    desc: 'BTN 2.5BB 오픈에 BB에서 T9s를 들고 있다. 3-벳, 콜, 폴드 중 최적은?',
-  },
-]
 
 export default function HomePage() {
   return (
@@ -115,36 +90,24 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Sample problems */}
-      <section className="py-20" aria-labelledby="problems-heading">
+      {/* Sample quiz */}
+      <section className="py-20" aria-labelledby="quiz-heading">
         <div className="mx-auto max-w-6xl px-4">
           <div className="flex items-center justify-between mb-10">
-            <h2 id="problems-heading" className="text-3xl font-bold">
-              이런 <span className="text-gold">문제</span>를 풀어요
-            </h2>
+            <div>
+              <h2 id="quiz-heading" className="text-3xl font-bold">
+                지금 바로 <span className="text-gold">풀어보세요</span>
+              </h2>
+              <p className="text-sm text-[var(--color-text-muted)] mt-2">
+                로그인 없이 체험할 수 있어요
+              </p>
+            </div>
             <Link href="/problems">
-              <Button variant="ghost" size="sm">전체 보기 →</Button>
+              <Button variant="ghost" size="sm">전체 문제 →</Button>
             </Link>
           </div>
-          <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
-            {SAMPLE_PROBLEMS.map((problem) => (
-              <Card key={problem.title} hover className="group cursor-pointer">
-                <Card.Header className="flex items-start justify-between gap-3">
-                  <h3 className="font-semibold text-[var(--color-text-primary)] group-hover:text-[var(--color-gold)] transition-colors line-clamp-2">
-                    {problem.title}
-                  </h3>
-                  <div className="flex flex-col gap-1 shrink-0">
-                    <Badge variant={DIFFICULTY_COLORS[problem.difficulty as keyof typeof DIFFICULTY_COLORS]} size="sm">
-                      {problem.difficulty}
-                    </Badge>
-                    <Badge variant="muted" size="sm">{problem.category}</Badge>
-                  </div>
-                </Card.Header>
-                <Card.Body>
-                  <p className="text-sm text-[var(--color-text-muted)]">{problem.desc}</p>
-                </Card.Body>
-              </Card>
-            ))}
+          <div className="max-w-lg">
+            <HomeSampleQuiz />
           </div>
         </div>
       </section>

@@ -1,21 +1,26 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { Action, Problem, Submission } from '@/types'
 import { Button } from '@/components/ui/Button'
 import { Card } from '@/components/ui/Card'
 import { Badge } from '@/components/ui/Badge'
 import { PROBLEMS } from '@/lib/data/problems'
+import { annotateGlossary } from '@/lib/glossary'
 
-function renderInlineMarkdown(text: string): React.ReactNode[] {
+function renderInlineMarkdown(text: string, keyPrefix: string | number = 0): React.ReactNode[] {
   const parts = text.split(/(\*\*[^*]+\*\*)/)
-  return parts.map((part, i) => {
+  const out: React.ReactNode[] = []
+  for (let i = 0; i < parts.length; i++) {
+    const part = parts[i]
     if (part.startsWith('**') && part.endsWith('**')) {
-      return <strong key={i} className="font-semibold text-[var(--color-text-primary)]">{part.slice(2, -2)}</strong>
+      out.push(<strong key={i} className="font-semibold text-[var(--color-text-primary)]">{part.slice(2, -2)}</strong>)
+    } else {
+      out.push(...annotateGlossary(part, `${keyPrefix}-${i}`))
     }
-    return part
-  })
+  }
+  return out
 }
 
 function ModelAnswer({ text }: { text: string }) {
@@ -131,7 +136,7 @@ export function SubmitForm({ problem }: SubmitFormProps) {
     : ['FOLD', 'CALL', 'RAISE', 'CHECK', 'ALL_IN']
 
   async function handleSubmit() {
-    if (!selectedAction || reasoning.trim().length < 10) return
+    if (!selectedAction) return
 
     setLoading(true)
     setError(null)
@@ -166,11 +171,7 @@ export function SubmitForm({ problem }: SubmitFormProps) {
     return <EvaluationDisplay submission={result.submission} problem={problem} onReset={() => setResult(null)} />
   }
 
-  const submitHint = !selectedAction
-    ? '액션을 먼저 선택해주세요'
-    : reasoning.trim().length < 10
-      ? `근거를 ${10 - reasoning.trim().length}자 더 입력해주세요`
-      : null
+  const submitHint = !selectedAction ? '액션을 먼저 선택해주세요' : null
 
   return (
     <div className="space-y-6">
@@ -198,19 +199,17 @@ export function SubmitForm({ problem }: SubmitFormProps) {
 
       <div>
         <label htmlFor="reasoning" className="block text-sm font-semibold uppercase tracking-widest text-[var(--color-text-muted)] mb-2">
-          근거를 설명해주세요
+          근거 설명{' '}
+          <span className="text-[var(--color-text-muted)] font-normal normal-case tracking-normal text-xs">(선택 — 쓰면 항목별 상세 분석)</span>
         </label>
         <textarea
           id="reasoning"
           value={reasoning}
           onChange={(e) => setReasoning(e.target.value)}
-          placeholder="왜 이 액션을 선택했나요? ICM, 포지션, 상대 레인지, 스택 크기 등을 고려해 설명해주세요. (최소 10자)"
-          rows={5}
+          placeholder="왜 이 액션을 선택했나요? ICM, 포지션, 상대 레인지, 스택 크기 등을 고려해 써보세요."
+          rows={4}
           className="w-full rounded-xl border border-[var(--color-surface-border)] bg-[var(--color-surface)] px-4 py-3 text-sm text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] focus:border-[var(--color-gold-dim)] focus:outline-none focus:ring-1 focus:ring-[var(--color-gold)] resize-none transition-colors"
         />
-        <p className="mt-1 text-xs text-[var(--color-text-muted)] text-right">
-          {reasoning.length}/2000자
-        </p>
       </div>
 
       {error && (
@@ -222,11 +221,11 @@ export function SubmitForm({ problem }: SubmitFormProps) {
       <Button
         onClick={handleSubmit}
         loading={loading}
-        disabled={!selectedAction || reasoning.trim().length < 10}
+        disabled={!selectedAction}
         className="w-full"
         size="lg"
       >
-        {loading ? 'AI가 채점 중...' : 'AI 채점 받기'}
+        {loading ? 'AI가 채점 중...' : reasoning.trim().length > 0 ? 'AI 상세 채점 받기' : '빠른 채점 받기'}
       </Button>
       {submitHint && (
         <p className="text-xs text-center text-[var(--color-text-muted)]">{submitHint}</p>
@@ -243,9 +242,27 @@ interface EvaluationDisplayProps {
 
 const DIFFICULTY_ORDER = ['BEGINNER', 'INTERMEDIATE', 'ADVANCED', 'EXPERT'] as const
 
+function useStreak() {
+  const [streak, setStreak] = useState(0)
+  useEffect(() => {
+    const today = new Date().toISOString().slice(0, 10)
+    const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10)
+    let data: { lastDate: string; count: number } = { lastDate: '', count: 0 }
+    try { data = JSON.parse(localStorage.getItem('poker_iq_streak') ?? '{}') } catch { /* noop */ }
+    const count = data.lastDate === today ? data.count
+      : data.lastDate === yesterday ? data.count + 1
+      : 1
+    localStorage.setItem('poker_iq_streak', JSON.stringify({ lastDate: today, count }))
+    setStreak(count)
+  }, [])
+  return streak
+}
+
 function EvaluationDisplay({ submission, problem, onReset }: EvaluationDisplayProps) {
   const eval_ = submission.evaluation!
   const pct = Math.round((eval_.totalScore / eval_.maxScore) * 100)
+  const streak = useStreak()
+  const hasReasoning = submission.reasoning.trim().length > 0
 
   const published = PROBLEMS.filter((p) => p.publishedAt !== null && p.id !== problem.id)
   const passed = pct >= 80
@@ -275,92 +292,38 @@ function EvaluationDisplay({ submission, problem, onReset }: EvaluationDisplayPr
               <span className="text-[var(--color-text-muted)] text-lg">/ {eval_.maxScore}</span>
             </div>
           </div>
-          <div className="text-right">
-            <p className="text-sm text-[var(--color-text-muted)] mb-1">선택한 액션</p>
-            <div className="flex items-center gap-2">
-              <span className="font-semibold">{submission.action}</span>
-              <Badge variant={isCorrectAction ? 'green' : 'red'} size="sm">
-                {isCorrectAction ? '정답' : '오답'}
-              </Badge>
+          <div className="text-right space-y-2">
+            <div>
+              <p className="text-sm text-[var(--color-text-muted)] mb-1">선택한 액션</p>
+              <div className="flex items-center justify-end gap-2">
+                <span className="font-semibold">{submission.action}</span>
+                <Badge variant={isCorrectAction ? 'green' : 'red'} size="sm">
+                  {isCorrectAction ? '정답' : '오답'}
+                </Badge>
+              </div>
             </div>
+            {streak > 0 && (
+              <p className="text-xs text-[var(--color-gold)]">
+                🔥 {streak}일 연속 풀이 중
+              </p>
+            )}
           </div>
         </Card.Body>
       </Card>
-
-      {/* Criteria breakdown */}
-      <div className="space-y-3">
-        <h3 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
-          항목별 점수
-        </h3>
-        {eval_.scores.map((score) => {
-          const criteria = problem.rubric.criteria.find((c) => c.id === score.criteriaId)
-          const scorePct = Math.round((score.score / score.maxScore) * 100)
-          return (
-            <Card key={score.criteriaId}>
-              <Card.Body className="py-4">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm font-medium text-[var(--color-text-primary)]">
-                    {criteria?.nameKo ?? score.criteriaId}
-                  </span>
-                  <span className="text-sm font-semibold tabular-nums text-[var(--color-text-muted)]">
-                    {score.score} / {score.maxScore}점
-                  </span>
-                </div>
-                <div className="h-1.5 rounded-full bg-[var(--color-surface-border)] overflow-hidden mb-2">
-                  <div
-                    className="h-full rounded-full bg-[var(--color-gold)] transition-all"
-                    style={{ width: `${scorePct}%` }}
-                    role="progressbar"
-                    aria-valuenow={scorePct}
-                    aria-valuemin={0}
-                    aria-valuemax={100}
-                  />
-                </div>
-                {score.feedback && (
-                  <p className="text-xs text-[var(--color-text-muted)] whitespace-pre-line">{score.feedback}</p>
-                )}
-              </Card.Body>
-            </Card>
-          )
-        })}
-      </div>
 
       {/* Overall feedback */}
       <Card>
         <Card.Header>
           <h3 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
-            AI 종합 피드백
+            AI 피드백
           </h3>
         </Card.Header>
         <Card.Body>
           <p className="text-sm text-[var(--color-text-primary)] leading-relaxed whitespace-pre-line">
-            {eval_.overallFeedback}
+            {annotateGlossary(eval_.overallFeedback, 'ofb')}
           </p>
         </Card.Body>
       </Card>
-
-      {/* Concepts to learn */}
-      {eval_.conceptsToLearn.length > 0 && (
-        <Card>
-          <Card.Header>
-            <h3 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
-              보강이 필요한 개념
-            </h3>
-          </Card.Header>
-          <Card.Body className="space-y-3">
-            {eval_.conceptsToLearn.map((concept) => (
-              <div key={concept}>
-                <Badge variant="gold" className="mb-1">{concept}</Badge>
-                {eval_.conceptExplanations[concept] && (
-                  <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
-                    {eval_.conceptExplanations[concept]}
-                  </p>
-                )}
-              </div>
-            ))}
-          </Card.Body>
-        </Card>
-      )}
 
       {/* Model answer */}
       <Card>
@@ -373,6 +336,87 @@ function EvaluationDisplay({ submission, problem, onReset }: EvaluationDisplayPr
           <ModelAnswer text={problem.rubric.modelAnswer} />
         </Card.Body>
       </Card>
+
+      {/* Detailed analysis — only when reasoning was provided */}
+      {hasReasoning && (
+        <>
+          <div className="space-y-3">
+            <h3 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
+              항목별 점수
+            </h3>
+            {eval_.scores.map((score) => {
+              const criteria = problem.rubric.criteria.find((c) => c.id === score.criteriaId)
+              const scorePct = Math.round((score.score / score.maxScore) * 100)
+              return (
+                <Card key={score.criteriaId}>
+                  <Card.Body className="py-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <span className="text-sm font-medium text-[var(--color-text-primary)]">
+                        {criteria?.nameKo ?? score.criteriaId}
+                      </span>
+                      <span className="text-sm font-semibold tabular-nums text-[var(--color-text-muted)]">
+                        {score.score} / {score.maxScore}점
+                      </span>
+                    </div>
+                    <div className="h-1.5 rounded-full bg-[var(--color-surface-border)] overflow-hidden mb-2">
+                      <div
+                        className="h-full rounded-full bg-[var(--color-gold)] transition-all"
+                        style={{ width: `${scorePct}%` }}
+                        role="progressbar"
+                        aria-valuenow={scorePct}
+                        aria-valuemin={0}
+                        aria-valuemax={100}
+                      />
+                    </div>
+                    {score.feedback && (
+                      <p className="text-xs text-[var(--color-text-muted)] whitespace-pre-line">
+                        {annotateGlossary(score.feedback, score.criteriaId)}
+                      </p>
+                    )}
+                  </Card.Body>
+                </Card>
+              )
+            })}
+          </div>
+
+          {eval_.conceptsToLearn.length > 0 && (
+            <Card>
+              <Card.Header>
+                <h3 className="text-sm font-semibold uppercase tracking-widest text-[var(--color-text-muted)]">
+                  보강이 필요한 개념
+                </h3>
+              </Card.Header>
+              <Card.Body className="space-y-3">
+                {eval_.conceptsToLearn.map((concept) => (
+                  <div key={concept}>
+                    <Badge variant="gold" className="mb-1">{concept}</Badge>
+                    {eval_.conceptExplanations[concept] && (
+                      <p className="text-sm text-[var(--color-text-muted)] leading-relaxed">
+                        {eval_.conceptExplanations[concept]}
+                      </p>
+                    )}
+                  </div>
+                ))}
+              </Card.Body>
+            </Card>
+          )}
+        </>
+      )}
+
+      {/* Nudge to write reasoning */}
+      {!hasReasoning && (
+        <div className="rounded-xl border border-[var(--color-gold-dim)] bg-[oklch(78%_0.16_78/0.06)] px-4 py-3 flex items-center justify-between gap-4">
+          <p className="text-sm text-[var(--color-text-muted)]">
+            근거를 쓰면 <span className="text-[var(--color-gold)]">항목별 상세 분석</span>을 받을 수 있어요.
+          </p>
+          <button
+            onClick={onReset}
+            className="text-xs font-semibold text-[var(--color-gold)] shrink-0 hover:opacity-80 transition-opacity"
+          >
+            다시 풀기 →
+          </button>
+        </div>
+      )}
 
       {/* Next actions */}
       <div className="flex gap-3 pt-2">
