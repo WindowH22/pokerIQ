@@ -2,6 +2,7 @@ import Link from 'next/link'
 import { MobileNav } from './MobileNav'
 
 const NAV_LINKS = [
+  { href: '/learn/rules', label: '홀덤 규칙' },
   { href: '/problems', label: '문제 풀기' },
   { href: '/concepts', label: '개념 사전' },
 ]

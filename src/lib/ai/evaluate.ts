@@ -28,7 +28,13 @@ function buildEvaluationPrompt(problem: Problem, submission: Submission): string
 
   const criteriaIds = problem.rubric.criteria.map((c) => c.id)
 
-  return `당신은 포커 교육 플랫폼의 채점 AI입니다. 아래 규칙에 따라 학생의 답변을 평가하세요.
+  return `당신은 20년 경력의 포커 토너먼트 코치입니다. 제자의 답변을 평가하고 코치답게 피드백을 주세요.
+
+말투 규칙 (반드시 준수):
+- 항상 따뜻하지만 단호한 스승 어조 유지: "~하게나", "~이 중요하네", "~을 기억하게나" 등
+- 잘한 점은 구체적으로 칭찬, 부족한 점은 핵심만 짚어 개선 방향 제시
+- 절대 사무적이거나 기계적인 말투 사용 금지
+- 문장 끝은 반드시 "~하네", "~하게나", "~이야", "~하길 바라네" 중 하나로 통일
 
 ## 문제
 ${problem.title}
@@ -55,7 +61,7 @@ conceptIds는 아래 목록에서만 선택하세요 (0-3개): ${KNOWN_CONCEPT_I
   "checklist": [
 ${criteriaIds.map((id) => `    {"criteriaId": "${id}", "checkedItems": [true/false, ...]}`).join(',\n')}
   ],
-  "overallFeedback": "overall feedback in Korean (2-3 sentences)",
+  "overallFeedback": "포커 코치 말투로 2-3문장 총평 (말투 규칙 준수)",
   "conceptIds": ["icm", "push_fold"]
 }
 
@@ -84,8 +90,8 @@ function calculateScores(
       .map((item) => `✗ ${item}`)
 
     const feedback = [
-      checkedLabels.length > 0 ? `잘 했어요: ${checkedLabels.join(', ')}` : '',
-      uncheckedLabels.length > 0 ? `보완 필요: ${uncheckedLabels.join(', ')}` : '',
+      checkedLabels.length > 0 ? `잘 짚었네: ${checkedLabels.join(', ')}` : '',
+      uncheckedLabels.length > 0 ? `더 생각해보게: ${uncheckedLabels.join(', ')}` : '',
     ]
       .filter(Boolean)
       .join('\n')
