@@ -37,8 +37,14 @@ const CATEGORY_LABELS: Record<ProblemCategory, string> = {
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }) {
   const { slug } = await params
   const problem = PROBLEMS.find((p) => p.slug === slug && p.publishedAt !== null)
+  const title = problem ? `${problem.title} — Poker IQ` : 'Poker IQ'
+  const description = problem?.description ?? 'AI가 채점하는 홀덤 실력 테스트'
+
   return {
-    title: problem ? `${problem.title} — Poker IQ` : 'Poker IQ',
+    title,
+    description,
+    openGraph: { title, description },
+    twitter: { card: 'summary_large_image', title, description },
   }
 }
 
