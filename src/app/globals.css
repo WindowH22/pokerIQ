@@ -127,6 +127,22 @@ body {
   animation: problemsGridFade 180ms var(--ease-out-expo) both;
 }
 
+/* Toast entrance */
+@keyframes toastIn {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.toast-slide {
+  animation: toastIn 200ms var(--ease-out-expo) both;
+}
+
 /* Scrollbar */
 ::-webkit-scrollbar {
   width: 6px;

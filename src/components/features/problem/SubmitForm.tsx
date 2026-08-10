@@ -258,11 +258,46 @@ function useStreak() {
   return streak
 }
 
+function useCopyLink(problem: Problem, submission: Submission, pct: number) {
+  const [toast, setToast] = useState(false)
+
+  async function copyLink() {
+    const isCorrect = submission.action === problem.correctAction
+    const isHighScore = pct >= 80
+    const text = [
+      isHighScore ? `🏆 [Poker IQ] ${problem.title}` : `[Poker IQ] ${problem.title}`,
+      `내 선택: ${ACTION_LABELS[submission.action]} (${isCorrect ? '정답' : '오답'})`,
+      `점수: ${submission.evaluation!.totalScore} / ${submission.evaluation!.maxScore} (${pct}%)`,
+      isHighScore ? '이 점수 나올 수 있어? 도전해봐 →' : '이 문제 너도 풀어봐 →',
+      window.location.href,
+    ].join('\n')
+
+    try {
+      await navigator.clipboard.writeText(text)
+      setToast(true)
+      setTimeout(() => setToast(false), 2000)
+    } catch { /* clipboard unavailable */ }
+  }
+
+  return { copyLink, toast }
+}
+
+function Toast({ children }: { children: React.ReactNode }) {
+  return (
+    <div className="fixed inset-x-0 bottom-6 z-50 flex justify-center px-4 pointer-events-none">
+      <div className="toast-slide rounded-full bg-[var(--color-surface-raised)] border border-[var(--color-surface-border)] px-5 py-2.5 text-sm font-medium text-[var(--color-text-primary)] shadow-lg">
+        {children}
+      </div>
+    </div>
+  )
+}
+
 function EvaluationDisplay({ submission, problem, onReset }: EvaluationDisplayProps) {
   const eval_ = submission.evaluation!
   const pct = Math.round((eval_.totalScore / eval_.maxScore) * 100)
   const streak = useStreak()
   const hasReasoning = submission.reasoning.trim().length > 0
+  const { copyLink, toast } = useCopyLink(problem, submission, pct)
 
   const published = PROBLEMS.filter((p) => p.publishedAt !== null && p.id !== problem.id)
   const passed = pct >= 80
@@ -419,20 +454,26 @@ function EvaluationDisplay({ submission, problem, onReset }: EvaluationDisplayPr
       )}
 
       {/* Next actions */}
-      <div className="flex gap-3 pt-2">
-        <Button variant="secondary" onClick={onReset} className="flex-1">
-          다시 풀기
+      <div className="space-y-3 pt-2">
+        <Button variant="secondary" onClick={copyLink} className="w-full">
+          결과 공유하기
         </Button>
-        {nextProblem ? (
-          <Link href={`/problems/${nextProblem.slug}`} className="flex-1">
-            <Button className="w-full">{nextLabel}</Button>
-          </Link>
-        ) : (
-          <Link href="/problems" className="flex-1">
-            <Button className="w-full">문제 목록</Button>
-          </Link>
-        )}
+        <div className="flex gap-3">
+          <Button variant="secondary" onClick={onReset} className="flex-1">
+            다시 풀기
+          </Button>
+          {nextProblem ? (
+            <Link href={`/problems/${nextProblem.slug}`} className="flex-1">
+              <Button className="w-full">{nextLabel}</Button>
+            </Link>
+          ) : (
+            <Link href="/problems" className="flex-1">
+              <Button className="w-full">문제 목록</Button>
+            </Link>
+          )}
+        </div>
       </div>
+      {toast && <Toast>링크가 복사되었습니다.</Toast>}
     </div>
   )
 }
